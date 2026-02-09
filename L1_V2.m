@@ -1,3 +1,6 @@
+% The currently working version. An LQG (+safety?) version is currently in
+% development. L1_V1.m and vibecode.m are not useful.
+
 close all
 clear
 clc
@@ -23,7 +26,7 @@ wbar = 1;
 vbar = 1;
 
 % Setting up subwords. This is specific to the case of only one switch.
-k = 4;                  % Subword length (memory over switching signal)
+k = 8;                  % Subword length (memory over switching signal)
 lengthP = k+1;          % Number of possible subwords (M^k in the most general case)
 P = cell(1, lengthP);   % Initializing set of all possible subwords
 % lengthP is thus the number of possible controllers after subword-based
@@ -46,20 +49,31 @@ P_next{end} = {lengthP};       % If p = 22, p+ = 22.
 % This is the state-feedback case. Working on output-feedback as well.
 
 cvx_begin quiet
-% variable Phixx(n*(T+1), n*(T+1), lengthP) lower_triangular;
-% variable Phixy(n*(T+1), m*(T+1), lengthP) lower_triangular;
-% variable Phiux(p*(T+1), n*(T+1), lengthP) lower_triangular;
-% variable Phiuy(p*(T+1), m*(T+1), lengthP) lower_triangular;
 variable Phixs(n, n, T+1, T+1, lengthP)
 variable Phius(p, n, T+1, T+1, lengthP)
 variable gam
 
 % Populating cells for ease of use
-Phix = cell(T+1, T+1, lengthP);
-Phiu = cell(T+1, T+1, lengthP);
+% Phix = cell(T+1, T+1, lengthP);
+% Phiu = cell(T+1, T+1, lengthP);
+Phix = repmat({zeros(n,n)}, T+1, T+1, lengthP);
+Phiu = repmat({zeros(p,n)}, T+1, T+1, lengthP);
 Phixnorm = cell(T+1, lengthP);      % For matrix norm
+
+% for i = 1:T+1
+%     for j = 1:i
+%         for l = 1:lengthP
+%             expression Phixs(n,n)
+%             expression Phius(p,n)
+%             Phix{i,j,l} = Phixs;
+%             Phiu{i,j,l} = Phius;
+%             Phixnorm{i,l} = [Phix{i,:,l}];
+%         end
+%     end
+% end
+
 for i = 1:T+1
-    for j = 1:T+1
+    for j = max(1,i-k+1):i
         for l = 1:lengthP
             Phix{i,j,l} = Phixs(:,:,i,j,l);
             Phiu{i,j,l} = Phius(:,:,i,j,l);
@@ -68,16 +82,15 @@ for i = 1:T+1
     end
 end
 
+minimize gam
+
 % Setting up objective: is this correct under subword memory?
+N = zeros(T+1, lengthP);
 for i = 1:T+1
 for l = 1:lengthP
-    N(i,l) = norm(Phixnorm{i,l}, Inf);
+    gam >= 2*norm(Phixnorm{i,l}, Inf);
 end
-NO(i) = max(N(i,:));
 end
-
-minimize gam
-gam >= max(NO)
 
 % Identity constraint
 for t = 1:T
@@ -88,11 +101,11 @@ end
 
 % Affine constraints from SLS imposed iteratively over subwords.
 for t = 1:T
-for tau = 1:t
+for tau = max(1,t-k+1):t-1
     for i = 1:lengthP
     for j = P_next{i}
-        j = j{:};
-        Phix{t+1, tau, j} == A{P{i}(end)}*Phix{t, tau, i} + B{P{i}(end)}*Phiu{t, tau, i}
+        J = j{:};
+        Phix{t+1, tau, J} == A{P{i}(end)}*Phix{t, tau, i} + B{P{i}(end)}*Phiu{t, tau, i}
     end
     end
 end
@@ -100,10 +113,10 @@ end
 
 cvx_end
 
-%% Recovering controller K
+% Recovering controller K
 K = cell(1, lengthP);
 for i = 1:lengthP
-    K{i} = Phiu(:,:,i)/Phix(:,:,i);
+    K{i} = cell2mat(Phiu(:,:,i))/cell2mat(Phix(:,:,i));
 end
 
 % Simulation
@@ -112,18 +125,21 @@ x = [x0 zeros(n,T)];
 u = zeros(p,T);
 % y = zeros(m*(T+1),1);
 
-[~,tf] = max(N);
-t_fault = tf+1;         % Fault time step (in Matlab array index)
+tf = 6;
+% t_fault = tf+1;         % Fault time step (in Matlab array index)
 sigma = [ones(1, tf) M*ones(1, T-tf+1)];
 
 for t = 1:T
-    w = 2*randi(2,n,1)-3;
-    v = 2*randi(2,m,1)-3;
+    w = -1 + 2*rand(n,1);
+    v = -1 + 2*rand(m,1);
 
-    sig = [ones(1,k-t) sigma(t-k+1:t)];             % Last k letters of switching signal
+    sig = [ones(1,k-t) sigma(max(1,t-k+1):t)];             % Last k letters of switching signal
     K_final = K{cellfun(@(x) isequal(x,sig), P)};   % Use controller corresponding to last k letters
+    K_final = K_final(:,(n+1):end);
 
     % y((m*(t-1)+1):m*t) = C{L_fault(t)}*x(:,t) + v;
-    u(:,t) = K_final(p*(t-1)+1:p*t,:)*vec(x);
-    x(:,t+1) = A{L_fault(t)}*x(:,t) + B{L_fault(t)}*u(:,t) + w;
+    vecx1 = x(:);
+    vecx = vecx1(1:T*n);
+    u(:,t) = K_final(p*(t-1)+1:p*t,:)*vecx;
+    x(:,t+1) = A{sigma(t)}*x(:,t) + B{sigma(t)}*u(:,t) + w;
 end

@@ -3,12 +3,6 @@ clear
 clc
 format compact
 
-% Function that takes in a parameter ctr for which controller to use, and
-% returns state and input history.
-% ctr = 1: fault-tolerant
-% ctr = 2: no fault-tolerance
-% ctr = 3; memoryless
-
 M = 2;      % Number of systems
 T = 10;     % Time horizon
 
@@ -73,15 +67,15 @@ minimize gam
 gam >= max(N)
 
 % Identity constraint
-for t = 1:T-1
+for t = 0:T-1
     for j = 1:lengthP
         Phix(((t+1)*n+1):(t+2)*n, (t*n+1):(t+1)*n, j) == eye(n)
     end
 end
 
 % Affine constraints from SLS imposed iteratively over subwords.
-for tau = 0:T
-for t = tau:T-1
+for t = 0:T-1
+for tau = 0:t-1
     for i = 1:lengthP
     for j = P_next{i}
         j = j{:};
@@ -94,12 +88,13 @@ end
 
 cvx_end
 
+%% Recovering controller K
 K = cell(1, lengthP);
 for i = 1:lengthP
     K{i} = Phiu(:,:,i)/Phix(:,:,i);
 end
 
-%% Below this is incomplete. Simulation to be modified.
+% Simulation
 x0 = -1+2*rand(n,1);
 x = [x0 zeros(n,T)];
 u = zeros(p,T);
