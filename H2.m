@@ -1,3 +1,4 @@
+% H2-optimal control, L-CSS paper.
 function [x, u, K_final, t_fault] = H2(ctr, T)
 
 % Function that takes in a parameter ctr for which controller to use, and
