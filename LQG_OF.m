@@ -1,7 +1,7 @@
-% LQG problem using Scalable SLS and switching signal memory. Continues to
-% result in a cost of 1.7321 always. Not fully explainable at the moment.
-% Perhaps we should run trajectories and compare between different memory
-% sizes. (The cost value was the same in both state- and output-feedback.)
+% LQG problem using Scalable SLS and switching signal memory. 
+% Continues to result in identical cost for all memory, but I'm starting to
+% believe this has something to do with the example. The values are much
+% too small for meaningful differences to appear.
 
 close all
 clear
