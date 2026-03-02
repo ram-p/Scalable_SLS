@@ -28,7 +28,7 @@ wbar = 1;
 vbar = 1;
 
 % Setting up subwords. This is specific to the case of only one switch.
-k = 4;                  % Subword length (memory over switching signal)
+k = 3;                  % Subword length (memory over switching signal)
 lengthP = k+1;          % Number of possible subwords (M^k in the most general case)
 P = cell(1, lengthP);   % Initializing set of all possible subwords
 % lengthP is thus the number of possible controllers after subword-based
