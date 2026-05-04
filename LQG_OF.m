@@ -1,5 +1,6 @@
 % LQG problem using Scalable Output-Feedback SLS and switching signal memory. 
-% Run gamvk.m to see impacts of memory on cost and runtime.
+% Run gamvk.m to see impacts of memory on cost and runtime. Updates using
+% Markov parameter clustering are yet to be performed.
 
 function [gam, cvx_cputime] = LQG_OF(k, T)
 
@@ -58,7 +59,8 @@ end
 % We now use cvx to code the optimization using SLS.
 % This is the output-feedback case.
 
-cvx_begin quiet
+cvx_begin
+cvx_solver sedumi
 variable Phixxs(n, n, T+1, T+1, lengthP)
 variable Phixys(n, m, T+1, T+1, lengthP)
 variable Phiuxs(p, n, T+1, T+1, lengthP)
