@@ -1,9 +1,17 @@
-% LQG problem using Scalable Output-Feedback SLS and switching signal memory. 
-% Run gamvk.m to see impacts of memory on cost and runtime.
+% LQG problem using Scalable Output-Feedback SLS, with memory over
+% measurements and switching signal, as well as Markov parameter
+% clustering. Run gamvk.m to see impacts of memory on cost and runtime.
 
-function [gam, cvx_cputime] = LQG_OF(k, T)
+% NOTE ——— This isn't the final version: we are most interested in impacts of
+% number of clusters, so this would have to be incorporated.
 
-% k denotes memory over both switching signal and measurements.
+% NOTE ——— This is work-in-progress, the portions between lines 119 and 130
+% need to be correctly written. As of now, this code doesn't run.
+
+function [gam, cvx_cputime] = LQG_MP(k, T, Nc)
+
+% k denotes memory over both switching signal and measurements, T denotes
+% the full time horizon, and Nc denotes the number of clusters.
 
 M = 2;      % Number of systems
 
@@ -35,16 +43,18 @@ C{2} = C{1};
 wbar = 1;
 vbar = 1;
 
-% Setting up subwords. This is specific to the case of only one switch.
-lengthP = k+1;          % Number of possible subwords (M^k in the most general case)
-P = cell(1, lengthP);   % Initializing set of all possible subwords
-% lengthP is thus the number of possible controllers after subword-based
-% clustering.
+% Matrix of Markov parameters
+X = MP(A,B,C,M,k);
+Nseq = M^k;      % Number of possible sequences of Markov parameters
 
-% Create set of possible subwords
-for i = 1:lengthP
-    P{i} = [ones(1, lengthP-i) M*ones(1, i-1)];
-end
+% Setting up clustering
+% Nc = 4;                           % Number of clusters = Number of controllers
+[idx, centres] = kmeans(X, Nc);     % k-means clustering on Markov parameters, with Nc clusters.
+
+% % Create set of possible subwords
+% for i = 1:lengthP
+%     P{i} = [ones(1, lengthP-i) M*ones(1, i-1)];
+% end
 
 % % Setting up next subwords
 % P_next = cell(1, lengthP);      % Set of possible next subwords
@@ -54,27 +64,25 @@ end
 % end
 % P_next{end} = {lengthP};       % If p = 2222, p+ = 2222.
 
-% We now use cvx to code the optimization using SLS.
-% This is the output-feedback case.
-
+% Using cvx to code the optimization using SLS.
 cvx_begin
 % cvx_solver sedumi
-variable Phixxs(n, n, T+1, T+1, lengthP)
-variable Phixys(n, p, T+1, T+1, lengthP)
-variable Phiuxs(m, n, T+1, T+1, lengthP)
-variable Phiuys(m, p, T+1, T+1, lengthP)
+variable Phixxs(n, n, T+1, T+1, Nc)
+variable Phixys(n, p, T+1, T+1, Nc)
+variable Phiuxs(m, n, T+1, T+1, Nc)
+variable Phiuys(m, p, T+1, T+1, Nc)
 variable gam
 
 % Populating cells for ease of use
-Phixx = repmat({zeros(n,n)}, T+1, T+1, lengthP);
-Phixy = repmat({zeros(n,p)}, T+1, T+1, lengthP);
-Phiux = repmat({zeros(m,n)}, T+1, T+1, lengthP);
-Phiuy = repmat({zeros(m,p)}, T+1, T+1, lengthP);
+Phixx = repmat({zeros(n,n)}, T+1, T+1, Nc);
+Phixy = repmat({zeros(n,p)}, T+1, T+1, Nc);
+Phiux = repmat({zeros(m,n)}, T+1, T+1, Nc);
+Phiuy = repmat({zeros(m,p)}, T+1, T+1, Nc);
 
 for i = 1:T+1
     for j = max(1,i-k+1):i
     % for j = 1:i
-        for l = 1:lengthP
+        for l = 1:Nc
             Phixx{i,j,l} = Phixxs(:,:,i,j,l);
             Phixy{i,j,l} = Phixys(:,:,i,j,l);
             Phiux{i,j,l} = Phiuxs(:,:,i,j,l);
@@ -86,13 +94,13 @@ end
 minimize gam
 
 % Setting up objective
-for l = 1:lengthP
+for l = 1:Nc
     gam >= norm([Phixx{:,:,l}  Phixy{:,:,l}; Phiux{:,:,l}  Phiuy{:,:,l}], "fro")
 end
 
 % Identity constraint
 for t = 1:T
-    for j = 1:lengthP
+    for j = 1:Nc
         Phixx{t+1, t, j} == eye(n)
         Phixy{t+1, t, j} == zeros(n,p)
         Phiux{t+1, t, j} == zeros(m,n)
@@ -102,13 +110,22 @@ end
 % Affine constraints from SLS imposed iteratively over subwords.
 for t = 1:T
 for tau = max(1,t-k+1):t-1
-% for tau = 1:t-1
-    for i = 1:lengthP
+    for i = 1:Nc
     % % Remove the following loop? Since this is an issue with system
     % % responses, we're only concerned with how system responses change from
     % % t to t+1, and maybe not the fact that p also changes to p_next?
     % for j = P_next{i}
     %     J = j{:};
+
+    % Finding the sigma that produced a path in the given cluster i
+        % All possible sequences of modes
+        seqs = dec2base(0:Nseq-1, M) - '0' + 1;
+        % Finding the rows of X that correspond to the current cluster
+        rowsX = ismember(idx, i, 'rows');
+        % Finding all sigmas corresponding to those rows of X
+        sig = seqs(rowsX,:);
+        % CONTINUE WORKING FROM HERE.
+
         Phixx{t+1, tau, i} == A{P{i}(end)}*Phixx{t, tau, i} + B{P{i}(end)}*Phiux{t, tau, i}
         Phixy{t+1, tau, i} == A{P{i}(end)}*Phixy{t, tau, i} + B{P{i}(end)}*Phiuy{t, tau, i}
         Phixx{t+1, tau, i} == Phixx{t, tau, i}*A{P{i}(end)} + Phixy{t, tau, i}*C{P{i}(end)}
@@ -123,8 +140,8 @@ cvx_end
 end
 
 % % Recovering controller K
-% K = cell(1, lengthP);
-% for i = 1:lengthP
+% K = cell(1, Nc);
+% for i = 1:Nc
 %     K{i} = cell2mat(Phiuy(:,:,i)) - cell2mat(Phiux(:,:,i))*(cell2mat(Phixx(:,:,i))\cell2mat(Phixy(:,:,i)));
 % end
 % 

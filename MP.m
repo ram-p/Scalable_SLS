@@ -5,8 +5,8 @@
 
 function X = MP(A, B, C, M, k)
 
-    p = size(C{1},1);
     m = size(B{1},2);
+    p = size(C{1},1);
 
     % Total number of sequences
     Nseq = M^k;
