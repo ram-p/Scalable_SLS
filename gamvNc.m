@@ -7,15 +7,15 @@ clear
 clc
 format compact
 
-T = 30;
-k = 4;
-Nc_lim = 5;
+T = 20;
+k = 6;
+Nc_lim = 3;
 gam = zeros(1, Nc_lim);
 soltim = zeros(1, Nc_lim);
 
 for i = 1:Nc_lim
     i
-    [gam(k), soltim(k)] = LQG_MP(k, T, i);
+    [gam(i), soltim(i)] = LQG_MP(k, T, i);
 end
 
 figure(1)

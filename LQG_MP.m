@@ -2,11 +2,10 @@
 % measurements and switching signal, as well as Markov parameter
 % clustering. Run gamvk.m to see impacts of memory on cost and runtime.
 
-% NOTE ——— This isn't the final version: we are most interested in impacts of
-% number of clusters, so this would have to be incorporated.
-
-% NOTE ——— This is work-in-progress, the portions between lines 119 and 130
-% need to be correctly written. As of now, this code doesn't run.
+% NOTE ——— Code is currently inaccurate. The piece between lines 110-136
+% must be checked, and perhaps "next cluster" loop must be incorporated. At
+% the moment, infeasibility results all the time.
+% Trivial infeasibilities when no cost is provided.
 
 function [gam, cvx_cputime] = LQG_MP(k, T, Nc)
 
@@ -117,20 +116,28 @@ for tau = max(1,t-k+1):t-1
     % for j = P_next{i}
     %     J = j{:};
 
-    % Finding the sigma that produced a path in the given cluster i
+        % Finding the sigma that produced a path in the given cluster i
         % All possible sequences of modes
         seqs = dec2base(0:Nseq-1, M) - '0' + 1;
         % Finding the rows of X that correspond to the current cluster
         rowsX = ismember(idx, i, 'rows');
         % Finding all sigmas corresponding to those rows of X
         sig = seqs(rowsX,:);
-        % CONTINUE WORKING FROM HERE.
-
-        Phixx{t+1, tau, i} == A{P{i}(end)}*Phixx{t, tau, i} + B{P{i}(end)}*Phiux{t, tau, i}
-        Phixy{t+1, tau, i} == A{P{i}(end)}*Phixy{t, tau, i} + B{P{i}(end)}*Phiuy{t, tau, i}
-        Phixx{t+1, tau, i} == Phixx{t, tau, i}*A{P{i}(end)} + Phixy{t, tau, i}*C{P{i}(end)}
-        Phiux{t+1, tau, i} == Phiux{t, tau, i}*A{P{i}(end)} + Phiuy{t, tau, i}*C{P{i}(end)}
-    % end
+        % Finding the final element of each sigma, for SLS constraints on
+        % the most recent time step
+        indices = sig(:, end);
+        ind_ND = unique(indices, 'rows');
+        % SLS constraints: remember: len(sig) families of constraints since
+        % the constraints are written for EACH possible switching signal
+        % found above. TO CONSIDER: Next cluster on the left-hand side, and
+        % how to do that.
+        for mode = ind_ND(:).'
+            Phixx{t+1, tau, i} == A{mode}*Phixx{t, tau, i} + B{mode}*Phiux{t, tau, i}
+            Phixy{t+1, tau, i} == A{mode}*Phixy{t, tau, i} + B{mode}*Phiuy{t, tau, i}
+            Phixx{t+1, tau, i} == Phixx{t, tau, i}*A{mode} + Phixy{t, tau, i}*C{mode}
+            Phiux{t+1, tau, i} == Phiux{t, tau, i}*A{mode} + Phiuy{t, tau, i}*C{mode}
+        end
+        % end
     end
 end
 end
