@@ -7,9 +7,9 @@ clear
 clc
 format compact
 
-T = 20;
-k = 6;
-Nc_lim = 3;
+T = 25;
+k = 5;
+Nc_lim = 4;
 gam = zeros(1, Nc_lim);
 soltim = zeros(1, Nc_lim);
 

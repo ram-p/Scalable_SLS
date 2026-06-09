@@ -63,6 +63,9 @@ Nseq = M^k;      % Number of possible sequences of Markov parameters
 % end
 % P_next{end} = {lengthP};       % If p = 2222, p+ = 2222.
 
+% All possible sequences of modes
+seqs = dec2base(0:Nseq-1, M) - '0' + 1;
+
 % Using cvx to code the optimization using SLS.
 cvx_begin
 % cvx_solver sedumi
@@ -106,32 +109,33 @@ for t = 1:T
     end
 end
 
-% Affine constraints from SLS imposed iteratively over subwords.
-for t = 1:T
-for tau = max(1,t-k+1):t-1
-    for i = 1:Nc
-    % % Remove the following loop? Since this is an issue with system
-    % % responses, we're only concerned with how system responses change from
-    % % t to t+1, and maybe not the fact that p also changes to p_next?
-    % for j = P_next{i}
-    %     J = j{:};
+% Affine constraints from SLS imposed iteratively.
+for i = 1:Nc
+% Finding the sigmas that produced a path in the given cluster i
+    % Finding the rows of X that correspond to the current cluster
+    rowsX = ismember(idx, i, 'rows');
+    % Finding all sigmas corresponding to those rows of X
+    sig = seqs(rowsX,:);
+    % Finding the unique last k-1 elements of each sig, since tau can take a
+    % maximum of k-1 values: t-k+1 <= tau <= t-1.
+    sig_u = unique(sig(:, 2:end), 'rows');
 
-        % Finding the sigma that produced a path in the given cluster i
-        % All possible sequences of modes
-        seqs = dec2base(0:Nseq-1, M) - '0' + 1;
-        % Finding the rows of X that correspond to the current cluster
-        rowsX = ismember(idx, i, 'rows');
-        % Finding all sigmas corresponding to those rows of X
-        sig = seqs(rowsX,:);
-        % Finding the final element of each sigma, for SLS constraints on
-        % the most recent time step
-        indices = sig(:, end);
-        ind_ND = unique(indices, 'rows');
+    for t = 1:T
+    for tau = max(1,t-k+1):t-1
+        % % Remove the following loop? Since this is an issue with system
+        % % responses, we're only concerned with how system responses change from
+        % % t to t+1, and maybe not the fact that p also changes to p_next?
+        % for j = P_next{i}
+        %     J = j{:};
+
         % SLS constraints: remember: len(sig) families of constraints since
         % the constraints are written for EACH possible switching signal
         % found above. TO CONSIDER: Next cluster on the left-hand side, and
         % how to do that.
-        for mode = ind_ND(:).'
+        for m_ind = 1:size(sig_u, 1)
+            mode = sig_u(m_ind, t-tau);
+            % Indicates which mode the system is in. Note t-tau is between
+            % 1 and k-1.
             Phixx{t+1, tau, i} == A{mode}*Phixx{t, tau, i} + B{mode}*Phiux{t, tau, i}
             Phixy{t+1, tau, i} == A{mode}*Phixy{t, tau, i} + B{mode}*Phiuy{t, tau, i}
             Phixx{t+1, tau, i} == Phixx{t, tau, i}*A{mode} + Phixy{t, tau, i}*C{mode}
@@ -139,7 +143,7 @@ for tau = max(1,t-k+1):t-1
         end
         % end
     end
-end
+    end
 end
 
 cvx_end
