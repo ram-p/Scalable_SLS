@@ -7,7 +7,7 @@ clear
 clc
 format compact
 
-T = 25;
+T = 10;
 k = 5;
 Nc_lim = 4;
 gam = zeros(1, Nc_lim);

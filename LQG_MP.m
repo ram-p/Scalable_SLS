@@ -2,10 +2,8 @@
 % measurements and switching signal, as well as Markov parameter
 % clustering. Run gamvk.m to see impacts of memory on cost and runtime.
 
-% NOTE ——— Code is currently inaccurate. The piece between lines 110-136
-% must be checked, and perhaps "next cluster" loop must be incorporated. At
-% the moment, infeasibility results all the time.
-% Trivial infeasibilities when no cost is provided.
+% NOTE ——— Code does not currently work. Switching to next cluster is
+% incorporated, but program still results in infeasibility.
 
 function [gam, cvx_cputime] = LQG_MP(k, T, Nc)
 
@@ -116,32 +114,42 @@ for i = 1:Nc
     rowsX = ismember(idx, i, 'rows');
     % Finding all sigmas corresponding to those rows of X
     sig = seqs(rowsX,:);
-    % Finding the unique last k-1 elements of each sig, since tau can take a
-    % maximum of k-1 values: t-k+1 <= tau <= t-1.
-    sig_u = unique(sig(:, 2:end), 'rows');
+    % Finding the unique elements of each sig.
+    sig_u = unique(sig, 'rows');
+    % Evaluating all possible "next" sigmas to incorporate inter-cluster
+    % dependency.
+    sig_next_pre = sig_u(:, 2:end);     % Prefix for next sigma uses 2:end most recent letters.
+    sig_next = [];
+    for l = 1:size(sig_next_pre, 1)
+        for model = 1:M
+            % All possible next sigmas by appending each letter to each
+            % prefix.
+            sig_next = [sig_next; [sig_next_pre(l,:) model]];
+        end
+    end
+    sig_next = unique(sig_next, 'rows');
+
+    % Finding all possible next clusters
+    next_clusters = unique(idx(ismember(seqs, sig_next, 'rows')), 'rows')';
 
     for t = 1:T
     for tau = max(1,t-k+1):t-1
-        % % Remove the following loop? Since this is an issue with system
-        % % responses, we're only concerned with how system responses change from
-        % % t to t+1, and maybe not the fact that p also changes to p_next?
-        % for j = P_next{i}
-        %     J = j{:};
+        for j = next_clusters
 
         % SLS constraints: remember: len(sig) families of constraints since
         % the constraints are written for EACH possible switching signal
         % found above. TO CONSIDER: Next cluster on the left-hand side, and
         % how to do that.
         for m_ind = 1:size(sig_u, 1)
-            mode = sig_u(m_ind, t-tau);
+            mode = sig_u(m_ind, t-tau+1);
             % Indicates which mode the system is in. Note t-tau is between
-            % 1 and k-1.
-            Phixx{t+1, tau, i} == A{mode}*Phixx{t, tau, i} + B{mode}*Phiux{t, tau, i}
-            Phixy{t+1, tau, i} == A{mode}*Phixy{t, tau, i} + B{mode}*Phiuy{t, tau, i}
-            Phixx{t+1, tau, i} == Phixx{t, tau, i}*A{mode} + Phixy{t, tau, i}*C{mode}
-            Phiux{t+1, tau, i} == Phiux{t, tau, i}*A{mode} + Phiuy{t, tau, i}*C{mode}
+            % 1 and k-1, since tau can take a maximum of k-1 values: t-k+1 <= tau <= t-1.
+            Phixx{t+1, tau, j} == A{mode}*Phixx{t, tau, i} + B{mode}*Phiux{t, tau, i}
+            Phixy{t+1, tau, j} == A{mode}*Phixy{t, tau, i} + B{mode}*Phiuy{t, tau, i}
+            Phixx{t+1, tau, j} == Phixx{t, tau, i}*A{mode} + Phixy{t, tau, i}*C{mode}
+            Phiux{t+1, tau, j} == Phiux{t, tau, i}*A{mode} + Phiuy{t, tau, i}*C{mode}
         end
-        % end
+        end
     end
     end
 end
