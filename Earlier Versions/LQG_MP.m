@@ -134,12 +134,11 @@ for i = 1:Nc
 
     for t = 1:T
     for tau = max(1,t-k+1):t-1
+    % for tau = 1:t-1
         for j = next_clusters
-
         % SLS constraints: remember: len(sig) families of constraints since
         % the constraints are written for EACH possible switching signal
-        % found above. TO CONSIDER: Next cluster on the left-hand side, and
-        % how to do that.
+        % found above.
         for m_ind = 1:size(sig_u, 1)
             mode = sig_u(m_ind, t-tau+1);
             % Indicates which mode the system is in. Note t-tau is between
